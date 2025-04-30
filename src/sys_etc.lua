@@ -15,7 +15,7 @@ local topic_pub = string.format(Mqtt_Topic_Pub, device_id)
 local topic_sub = string.format(Mqtt_Topic_Sub, device_id)
 local topic_srv = Mqtt_Topic_Srv
 
-sys.taskInit(function()
+sys.taskInit(function ()
   -- 等待联网
   local ret, device_id = sys.waitUntil(Status_Net_Ready)
 
@@ -41,7 +41,7 @@ sys.taskInit(function()
   mqttc:autoreconn(true, 3000)                  -- 自动重连机制
   mqttc:will(topic_pub, Mqtt_Client_Will, 1, 1) --离线通知
 
-  mqttc:on(function(mqtt_client, event, data, payload)
+  mqttc:on(function (mqtt_client, event, data, payload)
     if event == "conack" then
       -- mqtt_client:subscribe(topic_sub)--单主题订阅
       mqtt_client:subscribe({ [topic_sub] = 1, [topic_srv] = 1 }) --多主题订阅

@@ -1,0 +1,24 @@
+{
+    "emmylua.spell.dict": [
+        "mqttc",
+        "sysplus",
+        "libfota",
+        "rtos",
+        "wlan",
+        "imei",
+        "mqtt"
+    ],
+    "Lua.diagnostics.globals": [
+        "log",
+        "mcu",
+        "rtos",
+        "pm",
+        "wdt",
+        "wlan",
+        "mobile",
+        "w5500",
+        "device_id",
+        "pin",
+        "socket"
+    ]
+}

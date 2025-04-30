@@ -10,96 +10,96 @@ _G.isDebug = true
 --true: 调试模式开
 log.setLevel("INFO")
 
-_G.sys = require("sys")          --standard
-_G.sysplus = require("sysplus")  --mqtt needs
+_G.sys = require("sys")           --standard
+_G.sysplus = require("sysplus")   --mqtt needs
 _G.libfota2 = require("libfota2") --ota needs
-require("sys_const")             -- global define
+require("sys_const")              -- global define
 
 _G.device_id = mcu.unique_id():toHex()
 log.info(string.format("启动中，系统:%s 内核:%s 标识:%s", VERSION, rtos.version(), device_id))
 
 -- Air780E的AT固件默认会为开机键防抖, 导致部分用户刷机很麻烦
 if rtos.bsp() == "EC618" and pm and pm.PWK_MODE then
-    pm.power(pm.PWK_MODE, false)
+  pm.power(pm.PWK_MODE, false)
 end
 
-sys.taskInit(function()
-    --看门狗：3秒一喂，9秒超时
-    wdt.init(9000)
-    sys.timerLoopStart(wdt.feed, 3000)
+sys.taskInit(function ()
+  --看门狗：3秒一喂，9秒超时
+  wdt.init(9000)
+  sys.timerLoopStart(wdt.feed, 3000)
 end)
 
 ---------------------------------------------------------------------------------
-sys.taskInit(function()
-    -----------------------------
-    -- 统一联网函数
-    ----------------------------
-    if wlan and wlan.connect then
-        -- wifi
-        local ssid = "ssid"
-        local password = "pwd"
-        log.info("wifi", ssid, password)
+sys.taskInit(function ()
+  -----------------------------
+  -- 统一联网函数
+  ----------------------------
+  if wlan and wlan.connect then
+    -- wifi
+    local ssid = "ssid"
+    local password = "pwd"
+    log.info("wifi", ssid, password)
 
-        -- TODO 改成自动配网
-        -- LED = gpio.setup(12, 0, gpio.PULLUP)
-        wlan.init()
-        wlan.setMode(wlan.STATION) -- 默认也是这个模式,不调用也可以
-        device_id = wlan.getMac()
-        wlan.connect(ssid, password, 1)
-    elseif mobile then
-        -- Air780E/Air600E系列
-        --mobile.simid(2) -- 自动切换SIM卡
-        -- LED = gpio.setup(27, 0, gpio.PULLUP)
-        device_id = mobile.imei()
-    elseif w5500 then
-        -- w5500 以太网, 当前仅Air105支持
-        w5500.init(spi.HSPI_0, 24000000, pin.PC14, pin.PC01, pin.PC00)
-        w5500.config() --默认是DHCP模式
-        w5500.bind(socket.ETH0)
-        -- LED = gpio.setup(62, 0, gpio.PULLUP)
-    elseif socket or mqtt then
-        -- 适配的socket库也OK
-        -- 没有其他操作, 单纯给个注释说明
-    else
-        -- 其他不认识的bsp, 循环提示一下吧
-        while 1 do
-            sys.wait(1000)
-            log.info("bsp", "本bsp可能未适配网络层, 请查证")
-        end
+    -- TODO 改成自动配网
+    -- LED = gpio.setup(12, 0, gpio.PULLUP)
+    wlan.init()
+    wlan.setMode(wlan.STATION)     -- 默认也是这个模式,不调用也可以
+    device_id = wlan.getMac()
+    wlan.connect(ssid, password, 1)
+  elseif mobile then
+    -- Air780E/Air600E系列
+    --mobile.simid(2) -- 自动切换SIM卡
+    -- LED = gpio.setup(27, 0, gpio.PULLUP)
+    device_id = mobile.imei()
+  elseif w5500 then
+    -- w5500 以太网, 当前仅Air105支持
+    w5500.init(spi.HSPI_0, 24000000, pin.PC14, pin.PC01, pin.PC00)
+    w5500.config()     --默认是DHCP模式
+    w5500.bind(socket.ETH0)
+    -- LED = gpio.setup(62, 0, gpio.PULLUP)
+  elseif socket or mqtt then
+    -- 适配的socket库也OK
+    -- 没有其他操作, 单纯给个注释说明
+  else
+    -- 其他不认识的bsp, 循环提示一下吧
+    while 1 do
+      sys.wait(1000)
+      log.info("bsp", "本bsp可能未适配网络层, 请查证")
     end
+  end
 
-    log.info("联网中,请稍后...")
-    sys.waitUntil(Status_IP_Ready)
-    sys.publish(Status_Net_Ready, device_id)
+  log.info("联网中,请稍后...")
+  sys.waitUntil(Status_IP_Ready)
+  sys.publish(Status_Net_Ready, device_id)
 end)
 
 ---------------------------------------------------------------------------------
-local function fota_cb(ret)
-    log.info("fota", ret)
-    if ret == 0 then
-        log.info("升级包下载成功,重启模块")
-        rtos.reboot()
-    elseif ret == 1 then
-        log.info("连接失败", "请检查url拼写或服务器配置(是否为内网)")
-    elseif ret == 2 then
-        log.info("url错误", "检查url拼写")
-    elseif ret == 3 then
-        log.info("服务器断开", "检查服务器白名单配置")
-    elseif ret == 4 then
-        log.info("接收报文错误", "检查模块固件或升级包内文件是否正常")
-    elseif ret == 5 then
-        log.info("版本号书写错误", "iot平台版本号需要使用xxx.yyy.zzz形式")
-    else
-        log.info("不是上面几种情况 ret为",ret)
-    end
+local function ota_cb(ret)
+  if ret == 0 then
+    log.info("OTA: 下载成功,升级中...")
+    rtos.reboot()
+  elseif ret == 1 then
+    log.info("OTA: 连接失败,请检查url或服务器配置(是否为内网)")
+  elseif ret == 2 then
+    log.info("OTA: url错误")
+  elseif ret == 3 then
+    log.info("OTA: 服务器断开,检查服务器白名单配置")
+  elseif ret == 4 then
+    log.info("OTA: 接收报文错误,检查模块固件或升级包内文件是否正常")
+  elseif ret == 5 then
+    log.info("OTA: 版本号错误(xxx.yyy.zzz)")
+  else
+    log.info("OTA: 未定义错误 ", ret)
+  end
 end
 
 -- 使用iot平台进行升级
-sys.taskInit(function()
-    sys.waitUntil(Status_Net_Ready)
-    log.info("开始检查升级")
-    sys.wait(500)
-    libfota2.request(fota_cb, ota_opts)
+sys.taskInit(function ()
+  sys.waitUntil(Status_Net_Ready)
+  log.info("OTA: 开始检查升级")
+
+  sys.wait(500)
+  libfota2.request(ota_cb, ota_opts)
 end)
 
 --加载业务
