@@ -5,7 +5,7 @@
 local mqttc = nil
 local mqtt_host = "123.56.150.117"
 local mqtt_port = 8083
-local mqtt_isssl = false
+local mqtt_ssl = false
 
 local client_id = device_id
 local user_name = "user_etc"
@@ -35,7 +35,7 @@ sys.taskInit(function ()
   end
 
   -------------------------------------------------------------------------------
-  mqttc = mqtt.create(nil, mqtt_host, mqtt_port, mqtt_isssl)
+  mqttc = mqtt.create(nil, mqtt_host, mqtt_port, mqtt_ssl)
   mqttc:auth(client_id, user_name, password)    -- 认证
   mqttc:keepalive(240)                          -- 心跳间隔
   mqttc:autoreconn(true, 3000)                  -- 自动重连机制

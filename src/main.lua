@@ -43,7 +43,7 @@ sys.taskInit(function ()
     -- TODO 改成自动配网
     -- LED = gpio.setup(12, 0, gpio.PULLUP)
     wlan.init()
-    wlan.setMode(wlan.STATION)     -- 默认也是这个模式,不调用也可以
+    wlan.setMode(wlan.STATION) -- 默认也是这个模式,不调用也可以
     device_id = wlan.getMac()
     wlan.connect(ssid, password, 1)
   elseif mobile then
@@ -54,7 +54,7 @@ sys.taskInit(function ()
   elseif w5500 then
     -- w5500 以太网, 当前仅Air105支持
     w5500.init(spi.HSPI_0, 24000000, pin.PC14, pin.PC01, pin.PC00)
-    w5500.config()     --默认是DHCP模式
+    w5500.config() --默认是DHCP模式
     w5500.bind(socket.ETH0)
     -- LED = gpio.setup(62, 0, gpio.PULLUP)
   elseif socket or mqtt then
@@ -74,6 +74,7 @@ sys.taskInit(function ()
 end)
 
 ---------------------------------------------------------------------------------
+local ota_opts = {}
 local function ota_cb(ret)
   if ret == 0 then
     log.info("OTA: 下载成功,升级中...")
@@ -95,14 +96,46 @@ end
 
 -- 使用iot平台进行升级
 sys.taskInit(function ()
-  sys.waitUntil(Status_Net_Ready)
-  log.info("OTA: 开始检查升级")
+  sys.waitUntil(Status_OTA_Update)
+  log.info("OTA: 开始新版本确认")
 
   sys.wait(500)
   libfota2.request(ota_cb, ota_opts)
 end)
 
---加载业务
+---------------------------------------------------------------------------------
+-- 对于Cat.1模块, 移动/电信卡,通常会下发基站时间,那么sntp就不是必要的
+-- 联通卡通常不会下发, 就需要sntp了
+-- sntp内置了几个常用的ntp服务器, 也支持自选服务器
+
+sys.taskInit(function ()
+  if isDebug then --开发时不启用
+    return
+  end
+
+  sys.waitUntil(Status_Net_Ready)
+  sys.wait(1000)
+
+  while true do
+    -- 使用内置的ntp服务器地址, 包括阿里ntp
+    log.info("NTP: 开始同步时间")
+    socket.sntp()
+
+    -- 通常只需要几百毫秒就能成功
+    local ret = sys.waitUntil(Status_NTP_Ready, 5000)
+    if ret then
+      log.info("NTP: 时间同步成功 " .. os.date("%Y-%m-%d %H:%M:%S"))
+      --每天一次
+      sys.wait(3600000 * 24)
+    else
+      log.info("NTP: 时间同步失败")
+      sys.wait(3600000) -- 1小时后重试
+    end
+  end
+end)
+
+---------------------------------------------------------------------------------
+--加载业务: mqtt
 require("sys_etc")
 
 -- 用户代码已结束---------------------------------------------
