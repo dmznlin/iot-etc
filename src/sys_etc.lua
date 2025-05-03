@@ -15,6 +15,54 @@ local topic_pub = string.format(Mqtt_Topic_Pub, device_id)
 local topic_sub = string.format(Mqtt_Topic_Sub, device_id)
 local topic_srv = Mqtt_Topic_Srv
 
+--[[
+  date: 2025-05-03
+  parm: event,日志;remote,是否发送远程
+  desc: 打印运行日志
+--]]
+function Show_log(event, remote, level)
+  if (#event) < 1 then -- empty
+    return
+  end
+
+  level = (level ~= nil) and level or log.LOG_INFO --默认: info
+  remote = (remote ~= nil) and remote or false     --默认: 仅本地
+
+  if level == log.LOG_INFO then
+    log.info(event)
+  end
+
+  if level == log.LOG_WARN then
+    log.warn(event)
+  end
+
+  if level == log.LOG_ERROR then
+    log.error(event)
+  end
+
+  if remote and mqttc and mqttc:ready() then --mqtt connected
+    event = string.format('{"cmd": 3, "log": "%s"}', event)
+    sys.publish(Status_Mqtt_PubData, topic_pub, event, 0)
+  end
+end
+
+--[[
+  date: 2025-05-03
+  parm: data,数据
+  desc: 向 topic 发送数据
+--]]
+function Mqtt_send(data, topic, qos)
+  if (#data) < 1 then -- empty
+    return
+  end
+
+  if mqttc and mqttc:ready() then --mqtt connected
+    topic = (topic ~= nil) and topic or topic_pub
+    qos = (qos ~= nil) and qos or 0
+    sys.publish(Status_Mqtt_PubData, topic, data, qos)
+  end
+end
+
 sys.taskInit(function ()
   -- 等待联网
   local ret, device_id = sys.waitUntil(Status_Net_Ready)
@@ -36,10 +84,12 @@ sys.taskInit(function ()
 
   -------------------------------------------------------------------------------
   mqttc = mqtt.create(nil, mqtt_host, mqtt_port, mqtt_ssl)
-  mqttc:auth(client_id, user_name, password)    -- 认证
-  mqttc:keepalive(240)                          -- 心跳间隔
-  mqttc:autoreconn(true, 3000)                  -- 自动重连机制
-  mqttc:will(topic_pub, Mqtt_Client_Will, 1, 1) --离线通知
+  mqttc:auth(client_id, user_name, password) -- 认证
+  mqttc:keepalive(1000)                      -- 心跳间隔
+  mqttc:autoreconn(true, 5000)               -- 自动重连机制
+
+  local will = string.format('{"cmd": 2, "id": "%s"}', device_id)
+  mqttc:will(topic_pub, will, 1, 1) --离线通知
 
   mqttc:on(function (mqtt_client, event, data, payload)
     if event == "conack" then
@@ -47,12 +97,13 @@ sys.taskInit(function ()
       mqtt_client:subscribe({ [topic_sub] = 1, [topic_srv] = 1 }) --多主题订阅
 
       log.info("MQTT,连接成功.")
-      sys.publish(Status_Mqtt_ConnAck)
-      mqtt_client:publish(topic_pub, Mqtt_Client_Online, 1, 1) --上线通知
+      sys.publish(Status_Mqtt_Connected)
+
+      local online = string.format('{"cmd": 1, "id": "%s"}', device_id)
+      mqtt_client:publish(topic_pub, online, 1, 1) --上线通知
     elseif event == "recv" then
-      log.info("mqtt", "downlink", "topic", data, "payload", payload)
-      sys.publish("mqtt_payload", data, payload)
-    elseif event == "sent" then
+      sys.publish(Status_Mqtt_SubData, data, payload)
+      -- elseif event == "sent" then
       -- log.info("mqtt", "sent", "pkgid", data)
       -- elseif event == "disconnect" then
       -- 非自动重连时,按需重启mqttc
@@ -62,21 +113,47 @@ sys.taskInit(function ()
 
   log.info("MQTT,连接中...")
   mqttc:connect()
-  sys.waitUntil(Status_Mqtt_ConnAck)
+  sys.waitUntil(Status_Mqtt_Connected)
 
   -------------------------------------------------------------------------------
   while true do
-    -- 演示等待其他task发送过来的上报信息
-    local ret, topic, data, qos = sys.waitUntil("mqtt_pub", 300000)
+    local ret, topic, data, qos = sys.waitUntil(Status_Mqtt_PubData, 300000)
     if ret then
-      -- 提供关闭本while循环的途径, 不需要可以注释掉
+      -- 关闭本while循环
       if topic == "close" then break end
       mqttc:publish(topic, data, qos)
     end
-    -- 如果没有其他task上报, 可以写个空等待
-    --sys.wait(60000000)
   end
 
   mqttc:close()
   mqttc = nil
+end)
+
+
+-------------------------------------------------------------------------------
+---
+---
+--处理: 服务器 -> 设备数据
+sys.taskInit(function ()
+  while true do
+    ::continue::
+    local ret, topic, data = sys.waitUntil(Status_Mqtt_SubData)
+    local srv, err = json.decode(data)
+
+    if srv == nil or type(srv) ~= "table" or srv.cmd == nil then
+      Show_log("MQTT: 无效的命令格式(json)", true)
+      goto continue
+    end
+
+    if srv.cmd == Cmd_Get_SysInfo then --运行信息
+      local event = string.format('{"cmd": 4, "sys":, "%s"}', json.encode(Sys_Info()))
+      sys.publish(Status_Mqtt_PubData, topic_pub, event, 0)
+      goto continue
+    end
+
+    if srv.cmd == Cmd_OTA_Start then --OTA
+      sys.publish(Status_OTA_Update)
+      goto continue
+    end
+  end
 end)

@@ -5,6 +5,9 @@
 PRODUCT_KEY = "H1BQKAc5LXXa4crmQYbJnHpSYcH2EdiC"
 -- 在线升级
 
+Status_Log = "print_log"
+--系统消息: 打印日志
+
 Status_IP_Ready = "IP_READY"
 --luat发送：网络就绪
 
@@ -17,8 +20,14 @@ Status_NTP_Ready = "NTP_UPDATE";
 Status_OTA_Update = "ota_update"
 --系统消息：OTA在线升级
 
-Status_Mqtt_ConnAck = "mqtt_conack"
+Status_Mqtt_Connected = "mqtt_conn"
 --系统消息：mqtt连接成功
+
+Status_Mqtt_SubData = "mqtt_sub"
+--系统消息: mqtt收到订阅数据
+
+Status_Mqtt_PubData = "mqtt_pub"
+--系统消息: mqtt发布数据
 
 Mqtt_Topic_Pub = "etc/pub/%s"
 --上报:设备 ---> 服务器
@@ -26,10 +35,6 @@ Mqtt_Topic_Sub = "etc/sub/%s"
 --下发:设备 <--- 服务器
 Mqtt_Topic_Srv = "etc/srv"
 --广播：设备 <---> 服务器
-Mqtt_Client_Online = [[{"cmd": "status", "val": "online"}]]
---系统：上线通知
-Mqtt_Client_Will = [[{"cmd": "status", "val": "offline"}]]
---系统：离线通知
 
 ---------------------------------------------------------------------------------
 --[[
@@ -49,15 +54,27 @@ Mqtt_Client_Will = [[{"cmd": "status", "val": "offline"}]]
 
 --上线
 Cmd_Status_Online = 1
---{"cmd": 1}
+--{"cmd": 1, "id": "123"}
 
 --离线
 Cmd_Status_Offline = 2
---{"cmd": 2}
+--{"cmd": 2, "id": "123"}
 
 --运行日志
 Cmd_Run_log = 3
 --{"cmd": 3, "log": "msg"}
+
+--获取系统信息
+Cmd_Get_SysInfo = 4
+--{"cmd": 4, "sys":, "123"}
+
+--立即开启OTA
+Cmd_OTA_Start = 5
+--{"cmd": 5}
+
+--上报GPS
+Cmd_GPS_Loc = 6
+--{"cmd": 6, "lat": "1.1", "lng": "2.2"}
 
 --使用 etc id 获取欠缴单据
 Cmd_Get_Bills = 10
@@ -100,18 +117,28 @@ function Make_ID()
   return string.sub(device_id, #device_id - 5) .. str .. tostring(id_base)
 end
 
----------------------------------------------------------------------------------
 ---系统信息
 function Sys_Info()
   local info = {}
-  info["ver.sys"] = VERSION
-  info["ver.core"] = rtos.version()
+  info["sys.name"] = PROJECT
+  info["sys.ver"] = VERSION
+  info["sys.core"] = rtos.version()
 
   info["id.cpu"] = mcu.unique_id():toHex()
   info["id.dev"] = device_id
 
   info["mem.sys"] = string.format("%d,%d,%d", rtos.meminfo("sys")) -- 系统内存
   info["mem.lua"] = string.format("%d,%d,%d", rtos.meminfo("lua")) -- 虚拟机内存
+
+  if libgnss.isFix() then                                          --已定位
+    local loc = libgnss.getRmc(2) or {}
+    info["gps.lat"] = loc.lat                                      --纬度, 正数为北纬, 负数为南纬
+    info["gps.lng"] = loc.lng                                      --经度, 正数为东经, 负数为西经
+
+    local gsa = json.encode(libgnss.getGsa(), "11g")
+    info["gps.gsa"] = gas.sats --正在使用的卫星编号
+  end
+
   return info
 end
 

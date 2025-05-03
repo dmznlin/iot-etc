@@ -77,30 +77,39 @@ end)
 local ota_opts = {}
 local function ota_cb(ret)
   if ret == 0 then
-    log.info("OTA: 下载成功,升级中...")
+    log.info("OTA: 下载成功,升级中...", true)
     rtos.reboot()
   elseif ret == 1 then
-    log.info("OTA: 连接失败,请检查url或服务器配置(是否为内网)")
+    Show_log("OTA: 连接失败,请检查url或服务器配置(是否为内网)", true)
   elseif ret == 2 then
-    log.info("OTA: url错误")
+    Show_log("OTA: url错误")
   elseif ret == 3 then
-    log.info("OTA: 服务器断开,检查服务器白名单配置")
+    Show_log("OTA: 服务器断开,检查服务器白名单配置", true)
   elseif ret == 4 then
-    log.info("OTA: 接收报文错误,检查模块固件或升级包内文件是否正常")
+    Show_log("OTA: 接收报文错误,检查模块固件或升级包内文件是否正常", true)
   elseif ret == 5 then
-    log.info("OTA: 版本号错误(xxx.yyy.zzz)")
+    Show_log("OTA: 版本号错误(xxx.yyy.zzz)", true)
   else
-    log.info("OTA: 未定义错误 ", ret)
+    Show_log("OTA: 未定义错误 " .. tostring(ret), true)
   end
 end
 
 -- 使用iot平台进行升级
 sys.taskInit(function ()
-  sys.waitUntil(Status_OTA_Update)
-  log.info("OTA: 开始新版本确认")
+  local first = true
+  if isDebug then
+    first = false --开发时关闭自动更新
+  end
 
-  sys.wait(500)
-  libfota2.request(ota_cb, ota_opts)
+  while true do
+    if not first then
+      sys.waitUntil(Status_OTA_Update, 3600000 * 24) --每天1检
+    end
+
+    Show_log("OTA: 开始新版本确认")
+    sys.wait(500)
+    libfota2.request(ota_cb, ota_opts)
+  end
 end)
 
 ---------------------------------------------------------------------------------
@@ -138,5 +147,8 @@ end)
 --加载业务: mqtt
 require("sys_etc")
 
--- 用户代码已结束---------------------------------------------
+--加载业务: gps
+require("sys_gps")
+
+--代码结束
 sys.run()

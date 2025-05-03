@@ -6,7 +6,9 @@
         "rtos",
         "wlan",
         "imei",
-        "mqtt"
+        "mqtt",
+        "uart",
+        "libgnss"
     ],
     "Lua.diagnostics.globals": [
         "log",
@@ -19,6 +21,9 @@
         "w5500",
         "device_id",
         "pin",
-        "socket"
+        "socket",
+        "uart",
+        "libgnss",
+        "json"
     ]
 }
