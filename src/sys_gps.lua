@@ -2,14 +2,16 @@
   作者： dmzn@163.com 2025-05-01
   描述： gps定位服务
 -------------------------------------------------------------------------------]]
--- libgnss库初始化
-libgnss.clear() -- 清空数据,兼初始化
-
-local gnss = require("uc6228")
+-- libgnss:库初始化,清空数据
+libgnss.clear() --
 
 -- LED和ADC初始化
 LED_GNSS = 24
 gpio.setup(LED_GNSS, 0) -- GNSS定位成功灯
+
+local gnss = require("uc6228")
+--上行gps坐标
+Remote_location = true
 
 sys.taskInit(function ()
   gnss.setup({
@@ -26,12 +28,11 @@ sys.taskInit(function ()
   gnss.agps()
 
   while true do
-    if libgnss.isFix() then --已定位
+    if Remote_location and libgnss.isFix() then --已定位
       local loc = libgnss.getRmc(2) or {}
       Mqtt_send(string.format('{"cmd": 6, "lat": %s, "lng": %s}', loc.lat, loc.lng))
     end
 
-    Mqtt_send("gps location")
     sys.wait(6000) --每分1次
   end
 end)

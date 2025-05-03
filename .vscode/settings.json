@@ -8,7 +8,9 @@
         "imei",
         "mqtt",
         "uart",
-        "libgnss"
+        "libgnss",
+        "gnss",
+        "gpio"
     ],
     "Lua.diagnostics.globals": [
         "log",
@@ -24,6 +26,7 @@
         "socket",
         "uart",
         "libgnss",
-        "json"
+        "json",
+        "gpio"
     ]
 }

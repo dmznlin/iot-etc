@@ -62,19 +62,22 @@ Cmd_Status_Offline = 2
 
 --运行日志
 Cmd_Run_log = 3
---{"cmd": 3, "log": "msg"}
+--srv: {"cmd": 3, "log": "open"}
+--etc: {"cmd": 3, "log": "123"}
 
 --获取系统信息
 Cmd_Get_SysInfo = 4
---{"cmd": 4, "sys":, "123"}
+--srv: {"cmd": 4}
+--etc: {"cmd": 4, "sys":, "123"}
 
 --立即开启OTA
 Cmd_OTA_Start = 5
 --{"cmd": 5}
 
 --上报GPS
-Cmd_GPS_Loc = 6
---{"cmd": 6, "lat": "1.1", "lng": "2.2"}
+Cmd_GPS_Location = 6
+--srv: {"cmd": 6, "loc":"open" }
+--etc: {"cmd": 6, "lat": "1.1", "lng": "2.2"}
 
 --使用 etc id 获取欠缴单据
 Cmd_Get_Bills = 10

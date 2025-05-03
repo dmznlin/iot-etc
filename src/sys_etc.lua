@@ -20,13 +20,20 @@ local topic_srv = Mqtt_Topic_Srv
   parm: event,日志;remote,是否发送远程
   desc: 打印运行日志
 --]]
+local remote_log_init = 0 --远程日志开始计时
 function Show_log(event, remote, level)
-  if (#event) < 1 then -- empty
+  if (#event) < 1 then    -- empty
     return
   end
 
-  level = (level ~= nil) and level or log.LOG_INFO --默认: info
-  remote = (remote ~= nil) and remote or false     --默认: 仅本地
+  level = (level ~= nil) and level or log.LOG_INFO    --默认: info
+  remote = (remote ~= nil) and remote or false        --默认: 仅本地
+  remote = remote and (remote_log_init > 0) and
+      (os.difftime(os.time(), remote_log_init) < 600) --10分钟内有效
+
+  if remote_log_init > 0 and (not remote) then
+    remote_log_init = 0
+  end
 
   if level == log.LOG_INFO then
     log.info(event)
@@ -129,10 +136,7 @@ sys.taskInit(function ()
   mqttc = nil
 end)
 
-
 -------------------------------------------------------------------------------
----
----
 --处理: 服务器 -> 设备数据
 sys.taskInit(function ()
   while true do
@@ -145,6 +149,17 @@ sys.taskInit(function ()
       goto continue
     end
 
+    if srv.cmd == Cmd_Run_log then --上行日志到服务端
+      if srv.log == "open" then
+        remote_log_init = os.time()
+        Show_log("日志上行已打开", true)
+      else
+        remote_log_init = 0
+      end
+
+      goto continue
+    end
+
     if srv.cmd == Cmd_Get_SysInfo then --运行信息
       local event = string.format('{"cmd": 4, "sys":, "%s"}', json.encode(Sys_Info()))
       sys.publish(Status_Mqtt_PubData, topic_pub, event, 0)
@@ -153,6 +168,17 @@ sys.taskInit(function ()
 
     if srv.cmd == Cmd_OTA_Start then --OTA
       sys.publish(Status_OTA_Update)
+      goto continue
+    end
+
+    if srv.cmd == Cmd_GPS_Location then --gps
+      if srv.loc == "open" then
+        Remote_location = true
+        Show_log("GPS上行已打开", true)
+      else
+        Remote_location = false
+      end
+
       goto continue
     end
   end
