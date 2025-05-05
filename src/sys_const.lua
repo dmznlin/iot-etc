@@ -3,7 +3,15 @@
   描述： 全局常量定义
 -------------------------------------------------------------------------------]]
 PRODUCT_KEY = "H1BQKAc5LXXa4crmQYbJnHpSYcH2EdiC"
--- 在线升级
+--在线升级
+
+Time_low_power = "22:00:00"
+--时间: 低功耗开启
+Time_low_exit = "07:00:00"
+--时间: 低功耗退出
+
+Status_low_power = "low_power"
+--系统消息: 进入低功耗
 
 Status_Log = "print_log"
 --系统消息: 打印日志
@@ -83,6 +91,10 @@ Cmd_GPS_Location = 6
 Cmd_uart = 7
 --srv: {"cmd": 7, "data":"55 AA" }
 --etc: {"cmd": 7, "data":"55 AA" }
+
+--低功耗休眠
+Cmd_low_power = 8
+--srv: {"cmd": 8, "keep": 10}
 
 --使用 etc id 获取欠缴单据
 Cmd_Get_Bills = 10
@@ -246,4 +258,21 @@ function Str_from_hex(hex)
   return str:gsub("%x%x", function (c)
     return string.char(tonumber(c, 16))
   end)
+end
+
+--[[
+  date: 2025-05-05
+  parm: 时间字符串
+  desc: 将sTime转为日期格式
+--]]
+function Time_from_str(sTime)
+  local year, month, day, hour, minute, second = sTime:match("(%d+)-(%d+)-(%d+) (%d+):(%d+):(%d+)")
+  return os.time({
+    year = year,
+    month = month,
+    day = day,
+    hour = hour,
+    min = minute,
+    sec = second
+  })
 end

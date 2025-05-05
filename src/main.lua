@@ -30,6 +30,124 @@ sys.taskInit(function ()
 end)
 
 ---------------------------------------------------------------------------------
+local pm_a, pm_b, pm_reason = pm.lastReson()
+--pm_a: 0-上电/复位开机, 1-RTC开机, 2-WakeupIn/Pad/IO开机, 3-未知原因
+--pm_b: 0-普通开机(上电/复位),3-深睡眠开机,4-休眠开机
+if pm_a == 1 and pm_b == 3 then --深度睡眠醒来后,重启系统
+  --mobile.flymode(0, false)      --退出飞行模式
+  rtos.reboot()
+  do return end
+end
+
+--定时低功耗
+sys.taskInit(function ()
+  if pm_reason == 0 then
+    log.info("PM: powerkey开机")
+  elseif pm_reason == 1 then
+    log.info("PM: 充电或者AT指令下载完成后开机")
+  elseif pm_reason == 2 then
+    log.info("PM: 闹钟开机")
+  elseif pm_reason == 3 then
+    log.info("PM: 软件重启")
+  elseif pm_reason == 4 then
+    log.info("PM: 未知原因")
+  elseif pm_reason == 5 then
+    log.info("PM: RESET键")
+  elseif pm_reason == 6 then
+    log.info("PM: 异常重启")
+  elseif pm_reason == 7 then
+    log.info("PM: 工具控制重启")
+  elseif pm_reason == 8 then
+    log.info("PM: 内部看门狗重启")
+  elseif pm_reason == 9 then
+    log.info("PM: 外部重启")
+  elseif pm_reason == 10 then
+    log.info("PM: 充电开机")
+  end
+
+  if isDebug then --开发时不启用
+    return
+  end
+
+  --低功耗开启
+  local l_h, l_m, l_s = Time_low_power:match("(%d+):(%d+):(%d+)")
+  --低功耗退出
+  local e_h, e_m, e_s = Time_low_exit:match("(%d+):(%d+):(%d+)")
+
+  while true do
+    ::continue::                                             --跳转坐标
+    local ret, keep = sys.waitUntil(Status_low_power, 60000) --每1分钟
+
+    if not ret then                                          --超时: 没有服务器指令
+      local cur = os.time()                                  --当前时间
+      local dt = os.date("*t", cur)                          --拆分
+      local l_in = os.time({                                 --开启时间
+        year = dt.year,
+        month = dt.month,
+        day = dt.day,
+        hour = l_h,
+        min = l_m,
+        sec = l_s
+      })
+
+      local l_out = os.time({ --退出时间
+        year = dt.year,
+        month = dt.month,
+        day = dt.day,
+        hour = e_h,
+        min = e_m,
+        sec = e_s
+      })
+
+      if l_in > l_out then --跨天退出
+        dt = os.date("*t", cur + 24 * 3600);
+        l_out = os.time({
+          year = dt.year,
+          month = dt.month,
+          day = dt.day,
+          hour = e_h,
+          min = e_m,
+          sec = e_s
+        })
+      end
+
+      if (l_in > cur) or (l_in > l_out) then --未到时间,已超时
+        goto continue
+      end
+
+      keep = os.difftime(l_out, cur) --距离退出的秒数
+    end
+
+    log.info("PM: 进入低功耗模,keep ", keep)
+    sys.wait(2000) --wait remote log
+
+    --进入飞行模式
+    mobile.flymode(0, true)
+
+    --如果是插着USB测试，需要关闭USB
+    pm.power(pm.USB, false)
+
+    --关闭GPS电源
+    pm.power(pm.GPS, false)
+
+    --关闭GPS有源天线电源
+    pm.power(pm.GPS_ANT, false)
+
+    -- id = 0 或者 id = 1 是, 最大休眠时长是2.5小时
+    -- id >= 2是, 最大休眠时长是740小时
+    pm.dtimerStart(2, keep * 1000)
+
+    --[[
+      IDLE   正常运行,就是无休眠
+      LIGHT  轻休眠, CPU停止, RAM保持, 外设保持, 可中断唤醒. 部分型号支持从休眠处继续运行
+      DEEP   深休眠, CPU停止, RAM掉电, 仅特殊引脚保持的休眠前的电平, 大部分管脚不能唤醒设备.
+      HIB    彻底休眠, CPU停止, RAM掉电, 仅复位/特殊唤醒管脚可唤醒设备.
+    --]]
+    pm.request(pm.DEEP)
+  end
+end)
+
+---------------------------------------------------------------------------------
 sys.taskInit(function ()
   -----------------------------
   -- 统一联网函数
@@ -74,6 +192,13 @@ sys.taskInit(function ()
 end)
 
 ---------------------------------------------------------------------------------
+--加载业务: mqtt
+require("sys_etc")
+
+--加载业务: gps
+--require("sys_gps")
+
+---------------------------------------------------------------------------------
 local ota_opts = {}
 local function ota_cb(ret)
   if ret == 0 then
@@ -102,7 +227,9 @@ sys.taskInit(function ()
   end
 
   while true do
-    if not first then
+    if first then --启动时检查1次
+      first = false
+    else
       sys.waitUntil(Status_OTA_Update, 3600000 * 24) --每天1检
     end
 
@@ -142,13 +269,6 @@ sys.taskInit(function ()
     end
   end
 end)
-
----------------------------------------------------------------------------------
---加载业务: mqtt
-require("sys_etc")
-
---加载业务: gps
-require("sys_gps")
 
 --代码结束
 sys.run()

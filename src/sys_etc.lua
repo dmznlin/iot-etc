@@ -225,7 +225,7 @@ end)
 --处理: 服务器 -> 设备数据
 sys.taskInit(function ()
   while true do
-    ::continue::
+    ::continue:: --跳转坐标
     local ret, topic, data = sys.waitUntil(Status_Mqtt_SubData)
     local srv, err = json.decode(data)
 
@@ -272,6 +272,15 @@ sys.taskInit(function ()
       if #dt > 0 then
         log.info("Cmd_uart: ", Str_to_hex(dt))
         uart.write(uart_id, dt)
+      end
+
+      goto continue
+    end
+
+    if srv.cmd == Cmd_low_power then --low power
+      local keep = tonumber(srv.keep)
+      if keep > 0 then
+        sys.publish(Status_low_power, keep) --按秒计时
       end
 
       goto continue
