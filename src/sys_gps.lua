@@ -26,7 +26,9 @@ sys.taskInit(function ()
   pm.power(pm.GPS, true)
   gnss.start()
   gnss.agps()
+end)
 
+sys.taskInit(function ()
   while true do
     if Remote_location and libgnss.isFix() then --已定位
       local loc = libgnss.getRmc(2) or {}

@@ -79,6 +79,11 @@ Cmd_GPS_Location = 6
 --srv: {"cmd": 6, "loc":"open" }
 --etc: {"cmd": 6, "lat": "1.1", "lng": "2.2"}
 
+--串口通讯
+Cmd_uart = 7
+--srv: {"cmd": 7, "data":"55 AA" }
+--etc: {"cmd": 7, "data":"55 AA" }
+
 --使用 etc id 获取欠缴单据
 Cmd_Get_Bills = 10
 --etc: {"sn": "业务序号", "cmd": 10, "id": "123"}
@@ -138,8 +143,8 @@ function Sys_Info()
     info["gps.lat"] = loc.lat                                      --纬度, 正数为北纬, 负数为南纬
     info["gps.lng"] = loc.lng                                      --经度, 正数为东经, 负数为西经
 
-    local gsa = json.encode(libgnss.getGsa(), "11g")
-    info["gps.gsa"] = gas.sats --正在使用的卫星编号
+    local gsa = libgnss.getGsa()
+    info["gps.gsa"] = gsa.sats --正在使用的卫星编号
   end
 
   return info
@@ -215,4 +220,30 @@ function Table_from_str(value)
   end
 
   return result or {}
+end
+
+--[[
+  date: 2025-05-04
+  parm: 字符串
+  desc: 将str转为16进制表示
+--]]
+function Str_to_hex(str)
+  local first = true
+  return string.gsub(str, "(.)", function (x)
+    local ret = string.format(first and "%02X" or " %02X", string.byte(x))
+    if first then first = false end
+    return ret
+  end)
+end
+
+--[[
+  date: 2025-05-04
+  parm: 16进制字符串(55 AA)
+  desc: 将hex转为字符串
+--]]
+function Str_from_hex(hex)
+  local str = hex:gsub("[%s%p]", ""):upper()
+  return str:gsub("%x%x", function (c)
+    return string.char(tonumber(c, 16))
+  end)
 end

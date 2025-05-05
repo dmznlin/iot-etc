@@ -10,7 +10,8 @@
         "uart",
         "libgnss",
         "gnss",
-        "gpio"
+        "gpio",
+        "zbuff"
     ],
     "Lua.diagnostics.globals": [
         "log",
@@ -27,6 +28,8 @@
         "uart",
         "libgnss",
         "json",
-        "gpio"
+        "gpio",
+        "zbuff",
+        "uart_id"
     ]
 }
